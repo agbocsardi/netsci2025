@@ -5,7 +5,17 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "cython>=3.0.11",
     "jupyter>=1.1.1",
-    "torch>=2.6.0",
+    "pandas>=2.2.3",
+    "torch==2.5.0",
+    "torch-cluster>=1.6.3",
     "torch-geometric>=2.6.1",
+    "torch-geometric-temporal>=0.50.0",
+    "torch-scatter>=2.1.2",
+    "torch-sparse>=0.6.18",
+    "torch-spline-conv>=1.2.2",
 ]
+
+[[tool.uv.index]]
+url = "https://data.pyg.org/whl/torch-2.5.0+cpu.html"
