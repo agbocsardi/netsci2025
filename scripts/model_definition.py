@@ -1,36 +1,51 @@
-import torch.nn as nn
 import torch.nn.functional as F
-from torch_geometric.nn import GATConv
+from torch import nn
+from torch_geometric.nn import GATv2Conv
 
 
 class GATModel(nn.Module):
     def __init__(
-        self, num_node_features, num_edge_features, hidden_size=32, target_size=1
+        self,
+        num_node_features,
+        num_edge_features,  # Now used in the model
+        hidden_size=10,
+        target_size=1,
+        num_attention_heads=3,
+        dropout=0.0,
     ):
         super().__init__()
-        self.hidden_size = hidden_size
-        self.num_node_features = num_node_features
-        self.num_edge_features = num_edge_features
-        self.target_size = target_size
-        self.convs = [
-            GATConv(
-                self.num_node_features,
-                self.hidden_size,
-                edge_dim=self.num_edge_features,
-            ),
-            GATConv(
-                self.hidden_size, self.hidden_size, edge_dim=self.num_edge_features
-            ),
-        ]
-        self.linear = nn.Linear(self.hidden_size, self.target_size)
+
+        # First GAT layer with edge features
+        self.conv1 = GATv2Conv(
+            in_channels=num_node_features,
+            out_channels=hidden_size,
+            heads=num_attention_heads,
+            dropout=dropout,
+            edge_dim=num_edge_features,  # Incorporate edge features
+        )
+
+        # Second GAT layer, adjust the input size for multi-heads
+        self.conv2 = GATv2Conv(
+            in_channels=hidden_size * num_attention_heads,
+            out_channels=target_size,
+            heads=1,
+            concat=False,  # No concatenation since we're doing regression
+            dropout=dropout,
+            edge_dim=num_edge_features,  # Incorporate edge features
+        )
 
     def forward(self, data):
         x, edge_index, edge_attr = data.x, data.edge_index, data.edge_attr
-        for conv in self.convs[:-1]:
-            x = conv(x, edge_index, edge_attr=edge_attr)
-            x = F.relu(x)
-            x = F.dropout(x, training=self.training)
-        x = self.convs[-1](x, edge_index, edge_attr=edge_attr)
-        x = self.linear(x)
 
-        return F.relu(x)
+        # First GAT layer with edge attributes
+        x = F.dropout(x, p=0.6, training=self.training)
+        x = self.conv1(x, edge_index, edge_attr=edge_attr)
+
+        # Optional: Apply a non-linearity (e.g., ELU) between layers
+        x = F.elu(x)
+
+        # Second GAT layer with edge attributes
+        x = F.dropout(x, p=0.6, training=self.training)
+        x = self.conv2(x, edge_index, edge_attr=edge_attr)
+
+        return x
