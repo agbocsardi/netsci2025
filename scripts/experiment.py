@@ -85,23 +85,25 @@ def objective(trial):
             loss.backward()
             optimizer.step()
 
-        model.eval()
-        val_loss = 0
+    model.eval()
+    val_loss = 0
 
-        with torch.no_grad():
-            for data in val_loader:
-                output = model(data)
-                loss = F.mse_loss(output, data.y)
-                val_loss += loss.item() * data.num_graphs
+    with torch.no_grad():
+        for data in val_loader:
+            output = model(data)
+            loss = F.mse_loss(output, data.y)
+            val_loss += loss.item() * data.num_graphs
 
-        avg_val_loss = val_loss / len(val_loader.dataset)
+    avg_val_loss = val_loss / len(val_loader.dataset)
+
+    aim_callback.experiment.track(avg_val_loss, name="avg_val_loss")
 
     return avg_val_loss
 
 
 if __name__ == "__main__":
     study = optuna.create_study(direction="minimize")
-    study.optimize(objective, n_trials=100, callbacks=[aim_callback])
+    study.optimize(objective, n_trials=500, callbacks=[aim_callback])
 
     print("Number of finished trials: ", len(study.trials))
 
