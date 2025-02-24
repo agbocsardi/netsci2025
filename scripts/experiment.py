@@ -1,14 +1,14 @@
 import optuna
 import torch
 import torch.nn.functional as F
-from aim.optuna import AimCallBack
+from aim.optuna import AimCallback
 from data_loader import process_snowflake_exports, split_data
 from model_definition import GATModel
 from torch_geometric.loader import DataLoader
 
-EXPERIMENT_NAME = "initial trial"
+EXPERIMENT_NAME = "GAT on Pageviews"
 
-aim_callback = AimCallBack(
+aim_callback = AimCallback(
     as_multirun=True, metric_name="avg_val_loss", experiment_name=EXPERIMENT_NAME
 )
 
@@ -19,7 +19,7 @@ def initialize_model(num_node_features, num_edge_features, trial):
         num_edge_features=num_edge_features,
         hidden_size=trial.suggest_int("hidden_size", 4, 32, step=4),
         num_attention_heads=trial.suggest_int("num_heads", 4, 32, step=4),
-        dropout=trial.suggest_float("dropout", 0, 0, 1),
+        dropout=trial.suggest_float("dropout", 0, 1),
     )
 
 
@@ -37,17 +37,29 @@ def objective(trial):
 
     learning_rate = trial.suggest_float("learning_rate", 1e-5, 1e-3, log=True)
     batch_size = trial.suggest_int("batch_size", 1, 3)
-    epochs = 1000
+    epochs = trial.suggest_int("epochs", 100, 1000)
 
     graph_list, edge_feature_dict, node_feature_dict = process_snowflake_exports(
         node_attrs_used, target_var
     )
 
-    aim_callback.experiment.track(node_feature_dict, name="node attributes used")
-    aim_callback.experiment.track(edge_feature_dict, name="edge attributes used")
-    aim_callback.experiment.track(target_var, name="target variable")
-    aim_callback.experiment.track(learning_rate, name="learning_rate")
-    aim_callback.experiment.track(epochs, name="epochs")
+    # aim_callback.experiment.track(
+    #     Text(str(node_feature_dict)), name="node attributes used"
+    # )
+    aim_callback.experiment["node_attrs_used"] = list(node_feature_dict.keys())
+    aim_callback.experiment["node_attr_mapping"] = str(node_feature_dict)
+
+    aim_callback.experiment["edge_attrs_used"] = list(edge_feature_dict.keys())
+    aim_callback.experiment["edge_attr_mapping"] = str(edge_feature_dict)
+
+    aim_callback.experiment["target_variable"] = target_var
+
+    # aim_callback.experiment.track(
+    #     Text(str(edge_feature_dict)), name="edge attributes used"
+    # )
+    # aim_callback.experiment.track(Text(target_var), name="target variable")
+    # aim_callback.experiment.track(learning_rate, name="learning_rate")
+    # aim_callback.experiment.track(epochs, name="epochs")
 
     train_data, val_data, test_data = split_data(
         data_list=graph_list, train_split=0.6, val_split=0.2
